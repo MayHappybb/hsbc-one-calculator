@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HSBC One 余额计算器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'claude-bg': '#FAFAF8',
+                        'claude-card': '#FFFFFF',
+                        'claude-accent': '#D97706',
+                        'claude-accent-light': '#FEF3C7',
+                        'claude-text': '#1F2937',
+                        'claude-text-muted': '#6B7280',
+                        'claude-border': '#E5E7EB',
+                    },
+                    fontFamily: {
+                        'display': ['Crimson Pro', 'serif'],
+                        'body': ['IBM Plex Sans', 'Noto Sans SC', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'IBM Plex Sans', 'Noto Sans SC', sans-serif;
+        }
+        .font-display {
+            font-family: 'Crimson Pro', 'Noto Sans SC', serif;
+        }
+        .input-focus-ring:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.15);
+            border-color: #D97706;
+        }
+        .result-card {
+            opacity: 0;
+            transform: translateY(10px);
+            transition: opacity 0.4s ease, transform 0.4s ease;
+        }
+        .result-card.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .remittance-item {
+            transition: all 0.2s ease;
+        }
+        .remittance-item:hover {
+            background-color: #F9FAFB;
+        }
+        .toggle-btn {
+            transition: all 0.2s ease;
+        }
+        .toggle-btn.active {
+            background-color: #D97706;
+            color: white;
+        }
+        .daily-table {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .daily-table::-webkit-scrollbar {
+            width: 6px;
+        }
+        .daily-table::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 3px;
+        }
+        .daily-table::-webkit-scrollbar-thumb {
+            background: #D97706;
+            border-radius: 3px;
+        }
+        .daily-row {
+            transition: all 0.2s ease;
+        }
+        .daily-row:hover {
+            background-color: #FEF3C7;
+        }
+        .daily-row.today {
+            background-color: #FEF3C7;
+            border-left: 3px solid #D97706;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in {
+            animation: fadeIn 0.3s ease forwards;
+        }
+    </style>
+</head>
+<body class="bg-claude-bg min-h-screen py-8 px-4">
+    <div class="max-w-3xl mx-auto">
+        <!-- Header with Language Toggle -->
+        <header class="mb-10">
+            <div class="flex justify-between items-start mb-4">
+                <div class="flex-1"></div>
+                <button
+                    id="langToggle"
+                    onclick="toggleLanguage()"
+                    class="flex items-center gap-2 px-4 py-2 bg-white rounded-full border border-claude-border shadow-sm hover:shadow-md transition-all text-sm font-medium text-claude-text"
+                >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"></path>
+                    </svg>
+                    <span id="langText">English</span>
+                </button>
+            </div>
+            <div class="text-center">
+                <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-claude-accent-light mb-4">
+                    <svg class="w-6 h-6 text-claude-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                    </svg>
+                </div>
+                <h1 class="font-display text-3xl font-semibold text-claude-text mb-2" data-i18n="title">HSBC One 余额计算器</h1>
+                <p class="text-claude-text-muted text-sm max-w-md mx-auto leading-relaxed" data-i18n="subtitle">
+                    计算您需要汇款多少才能满足前3个月平均余额港币$10,000的要求
+                </p>
+            </div>
+        </header>
+
+        <!-- Main Card -->
+        <div class="bg-claude-card rounded-2xl shadow-sm border border-claude-border/50 p-6 md:p-8">
+            <!-- Account Opening Date -->
+            <div class="mb-8">
+                <label class="block text-sm font-medium text-claude-text mb-2" data-i18n="accountOpeningDate">开户日期</label>
+                <input
+                    type="date"
+                    id="openingDate"
+                    class="input-focus-ring w-full px-4 py-3 rounded-xl border border-claude-border bg-white text-claude-text transition-all duration-200"
+                    onchange="saveData()"
+                >
+                <p class="text-xs text-claude-text-muted mt-2" data-i18n="accountOpeningHint">您的评估期从该日期下个月的1号开始计算</p>
+            </div>
+
+            <!-- Remittances Section -->
+            <div class="mb-8">
+                <div class="flex items-center justify-between mb-4">
+                    <label class="block text-sm font-medium text-claude-text" data-i18n="remittanceHistory">汇款记录</label>
+                    <button
+                        onclick="addRemittance()"
+                        class="text-sm text-claude-accent hover:text-amber-700 font-medium flex items-center gap-1 transition-colors"
+                    >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                        </svg>
+                        <span data-i18n="addRemittance">添加汇款</span>
+                    </button>
+                </div>
+
+                <div id="remittanceList" class="space-y-3">
+                    <!-- Remittance items will be added here -->
+                </div>
+
+                <div id="emptyState" class="text-center py-8 border border-dashed border-claude-border rounded-xl">
+                    <p class="text-claude-text-muted text-sm" data-i18n="noRemittances">尚未添加汇款</p>
+                    <p class="text-claude-text-muted text-xs mt-1" data-i18n="addFirstRemittance">添加第一笔汇款开始计算</p>
+                </div>
+            </div>
+
+            <!-- Calculate Button -->
+            <button
+                onclick="calculate()"
+                class="w-full bg-claude-accent hover:bg-amber-700 text-white font-medium py-3.5 px-6 rounded-xl transition-all duration-200 shadow-sm hover:shadow-md active:scale-[0.98]"
+                data-i18n="calculate"
+            >
+                计算需求
+            </button>
+        </div>
+
+        <!-- Results Section -->
+        <div id="results" class="result-card mt-6 space-y-4">
+            <!-- Assessment Period -->
+            <div class="bg-claude-card rounded-2xl shadow-sm border border-claude-border/50 p-6">
+                <h3 class="font-display text-lg font-medium text-claude-text mb-4" data-i18n="assessmentPeriod">评估期间</h3>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="bg-amber-50 rounded-xl p-4">
+                        <p class="text-xs text-claude-text-muted uppercase tracking-wide mb-1" data-i18n="startDate">开始日期</p>
+                        <p id="periodStart" class="text-lg font-semibold text-claude-text">-</p>
+                    </div>
+                    <div class="bg-amber-50 rounded-xl p-4">
+                        <p class="text-xs text-claude-text-muted uppercase tracking-wide mb-1" data-i18n="endDate">结束日期</p>
+                        <p id="periodEnd" class="text-lg font-semibold text-claude-text">-</p>
+                    </div>
+                </div>
+                <div class="mt-4 pt-4 border-t border-claude-border">
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm text-claude-text-muted" data-i18n="totalAssessmentDays">评估总天数</span>
+                        <span id="totalDays" class="font-semibold text-claude-text">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Current Status -->
+            <div class="bg-claude-card rounded-2xl shadow-sm border border-claude-border/50 p-6">
+                <h3 class="font-display text-lg font-medium text-claude-text mb-4" data-i18n="currentStatus">当前状态</h3>
+                <div class="space-y-3">
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm text-claude-text-muted" data-i18n="requiredBalanceDays">所需余额天数</span>
+                        <span id="requiredBalanceDays" class="font-semibold text-claude-text">-</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm text-claude-text-muted" data-i18n="currentBalanceDays">当前余额天数</span>
+                        <span id="currentBalanceDays" class="font-semibold text-claude-text">-</span>
+                    </div>
+                    <div class="flex justify-between items-center pt-3 border-t border-claude-border">
+                        <span class="text-sm text-claude-text-muted" data-i18n="remainingBalanceDays">还需余额天数</span>
+                        <span id="remainingBalanceDays" class="font-semibold text-claude-accent">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Deposit Mode Toggle -->
+            <div class="bg-claude-card rounded-2xl shadow-sm border border-claude-border/50 p-6">
+                <h3 class="font-display text-lg font-medium text-claude-text mb-4" data-i18n="depositStrategy">存款策略</h3>
+                <div class="flex gap-2 mb-4">
+                    <button
+                        id="modeSingle"
+                        onclick="setDepositMode('single')"
+                        class="toggle-btn active flex-1 py-2 px-4 rounded-lg border border-claude-border text-sm font-medium"
+                        data-i18n="singleDeposit"
+                    >
+                        一次性存款
+                    </button>
+                    <button
+                        id="modeDaily"
+                        onclick="setDepositMode('daily')"
+                        class="toggle-btn flex-1 py-2 px-4 rounded-lg border border-claude-border text-sm font-medium"
+                        data-i18n="dailyDeposit"
+                    >
+                        每日存款
+                    </button>
+                </div>
+
+                <!-- Single Deposit Result -->
+                <div id="singleDepositResult">
+                    <div class="bg-claude-accent rounded-2xl shadow-lg p-6 text-white">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0">
+                                <svg class="w-6 h-6 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                            </div>
+                            <div class="flex-1">
+                                <h3 class="font-display text-lg font-medium mb-2" data-i18n="recommendation">建议</h3>
+                                <p id="recommendationText" class="text-amber-100 text-sm leading-relaxed mb-4">-</p>
+                                <div class="bg-white/10 rounded-xl p-4">
+                                    <p class="text-xs text-amber-200 mb-1" data-i18n="additionalDepositRequired">需额外存款</p>
+                                    <p id="requiredDeposit" class="text-2xl font-bold">-</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Daily Breakdown Table -->
+                    <div class="mt-4 bg-white rounded-2xl shadow-sm border border-claude-border/50 p-4">
+                        <div class="flex items-center justify-between mb-3">
+                            <h4 class="font-medium text-claude-text text-sm" data-i18n="dailyBreakdown">每日存款明细</h4>
+                            <span class="text-xs text-claude-text-muted" data-i18n="ifDepositOnThatDay">若在该日存款所需金额</span>
+                        </div>
+                        <div class="daily-table">
+                            <table class="w-full text-sm">
+                                <thead class="bg-gray-50 sticky top-0">
+                                    <tr>
+                                        <th class="text-left py-2 px-3 text-xs font-medium text-claude-text-muted" data-i18n="date">日期</th>
+                                        <th class="text-right py-2 px-3 text-xs font-medium text-claude-text-muted" data-i18n="daysToEnd">距结束</th>
+                                        <th class="text-right py-2 px-3 text-xs font-medium text-claude-text-muted" data-i18n="requiredAmount">需存金额</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="dailyBreakdownBody">
+                                    <!-- Dynamic rows -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Daily Deposit Result -->
+                <div id="dailyDepositResult" class="hidden">
+                    <div class="bg-claude-accent rounded-2xl shadow-lg p-6 text-white">
+                        <div class="flex items-start gap-4">
+                            <div class="flex-shrink-0">
+                                <svg class="w-6 h-6 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                </svg>
+                            </div>
+                            <div class="flex-1">
+                                <h3 class="font-display text-lg font-medium mb-2" data-i18n="dailyPlan">每日存款计划</h3>
+                                <p id="dailyPlanText" class="text-amber-100 text-sm leading-relaxed mb-4">-</p>
+                                <div class="bg-white/10 rounded-xl p-4">
+                                    <p class="text-xs text-amber-200 mb-1" data-i18n="dailyAmount">每日存款金额</p>
+                                    <p id="dailyDepositAmount" class="text-2xl font-bold">-</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Daily Plan Summary -->
+                    <div class="mt-4 bg-white rounded-2xl shadow-sm border border-claude-border/50 p-4">
+                        <h4 class="font-medium text-claude-text text-sm mb-3" data-i18n="planSummary">计划摘要</h4>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between">
+                                <span class="text-claude-text-muted" data-i18n="totalDaysRemaining">剩余总天数</span>
+                                <span id="planDaysRemaining" class="font-medium">-</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-claude-text-muted" data-i18n="totalDepositNeeded">总需存款</span>
+                                <span id="planTotalNeeded" class="font-medium">-</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-claude-text-muted" data-i18n="accumulatedByDaily">累计效果</span>
+                                <span id="planAccumulated" class="font-medium">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Already Met -->
+            <div id="successCard" class="bg-green-600 rounded-2xl shadow-lg p-6 text-white hidden">
+                <div class="flex items-center gap-4">
+                    <div class="flex-shrink-0">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="font-display text-lg font-medium" data-i18n="requirementMet">已满足要求！</h3>
+                        <p class="text-green-100 text-sm" data-i18n="requirementMetDesc">您的当前汇款已满足平均余额要求</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Download Button -->
+        <div class="mt-4 text-center">
+            <button
+                id="downloadBtn"
+                onclick="downloadResultImage()"
+                class="inline-flex items-center gap-2 px-6 py-3 bg-white rounded-xl border border-claude-border shadow-sm hover:shadow-md transition-all text-claude-text font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled
+            >
+                <svg class="w-5 h-5 text-claude-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                </svg>
+                <span data-i18n="downloadResult">下载结果图片</span>
+            </button>
+        </div>
+
+        <!-- Footer -->
+        <footer class="mt-10 text-center space-y-3">
+            <a
+                href="https://www.hsbc.com.hk/content/dam/hsbc/hk/vam/pdf/HSBC_One_FAQ.pdf"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="inline-flex items-center gap-1 text-sm text-claude-accent hover:text-amber-700 transition-colors"
+            >
+                <span data-i18n="viewOfficialFAQ">查看官方常见问题</span>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                </svg>
+            </a>
+            <p class="text-xs text-claude-text-muted" data-i18n="disclaimer">
+                本计算器仅供参考，请以汇丰银行官方要求为准
+            </p>
+        </footer>
+    </div>
+
+    <script>
+        // Translation dictionary
+        const translations = {
+            zh: {
+                title: "HSBC One 余额计算器",
+                subtitle: "计算您需要汇款多少才能满足前3个月平均余额港币$10,000的要求",
+                accountOpeningDate: "开户日期",
+                accountOpeningHint: "您的评估期从该日期下个月的1号开始计算",
+                remittanceHistory: "汇款记录",
+                addRemittance: "添加汇款",
+                noRemittances: "尚未添加汇款",
+                addFirstRemittance: "添加第一笔汇款开始计算",
+                calculate: "计算需求",
+                assessmentPeriod: "评估期间",
+                startDate: "开始日期",
+                endDate: "结束日期",
+                totalAssessmentDays: "评估总天数",
+                currentStatus: "当前状态",
+                requiredBalanceDays: "所需余额天数",
+                currentBalanceDays: "当前余额天数",
+                remainingBalanceDays: "还需余额天数",
+                depositStrategy: "存款策略",
+                singleDeposit: "一次性存款",
+                dailyDeposit: "每日存款",
+                recommendation: "建议",
+                additionalDepositRequired: "需额外存款",
+                dailyBreakdown: "每日存款明细",
+                ifDepositOnThatDay: "若在该日存款所需金额",
+                date: "日期",
+                daysToEnd: "距结束",
+                requiredAmount: "需存金额",
+                today: "今天",
+                dailyPlan: "每日存款计划",
+                dailyAmount: "每日存款金额",
+                planSummary: "计划摘要",
+                totalDaysRemaining: "剩余总天数",
+                totalDepositNeeded: "总需存款",
+                accumulatedByDaily: "累计效果",
+                requirementMet: "已满足要求！",
+                requirementMetDesc: "您的当前汇款已满足平均余额要求",
+                disclaimer: "本计算器仅供参考，请以汇丰银行官方要求为准",
+                langButton: "English",
+                daysRemainingText: "距离评估期结束还有 {days} 天",
+                depositTodayText: "要满足平均余额要求，您需要额外存款：",
+                periodEnded: "评估期已结束",
+                dailyPlanDesc: "从今天起每天存入相同金额，直到评估期结束",
+                downloadResult: "下载结果图片",
+                downloading: "生成中...",
+                viewOfficialFAQ: "查看官方常见问题",
+            },
+            en: {
+                title: "HSBC One Balance Calculator",
+                subtitle: "Calculate how much you need to remit to meet the HKD $10,000 average balance requirement",
+                accountOpeningDate: "Account Opening Date",
+                accountOpeningHint: "Your assessment period starts from the 1st of the next month",
+                remittanceHistory: "Remittance History",
+                addRemittance: "Add Remittance",
+                noRemittances: "No remittances added yet",
+                addFirstRemittance: "Add your first remittance to start",
+                calculate: "Calculate Requirements",
+                assessmentPeriod: "Assessment Period",
+                startDate: "Start Date",
+                endDate: "End Date",
+                totalAssessmentDays: "Total Assessment Days",
+                currentStatus: "Current Status",
+                requiredBalanceDays: "Required Balance-Days",
+                currentBalanceDays: "Current Balance-Days",
+                remainingBalanceDays: "Remaining Balance-Days",
+                depositStrategy: "Deposit Strategy",
+                singleDeposit: "Single Deposit",
+                dailyDeposit: "Daily Deposit",
+                recommendation: "Recommendation",
+                additionalDepositRequired: "Additional Deposit Required",
+                dailyBreakdown: "Daily Deposit Breakdown",
+                ifDepositOnThatDay: "Amount needed if deposited on that day",
+                date: "Date",
+                daysToEnd: "Days to End",
+                requiredAmount: "Required",
+                today: "Today",
+                dailyPlan: "Daily Deposit Plan",
+                dailyAmount: "Daily Deposit Amount",
+                planSummary: "Plan Summary",
+                totalDaysRemaining: "Days Remaining",
+                totalDepositNeeded: "Total Deposit Needed",
+                accumulatedByDaily: "Accumulated Effect",
+                requirementMet: "Requirement Met!",
+                requirementMetDesc: "Your current remittances satisfy the requirement",
+                disclaimer: "This calculator is for reference only. Please verify with HSBC.",
+                langButton: "中文",
+                daysRemainingText: "You have {days} days remaining in the assessment period",
+                depositTodayText: "To meet the average balance requirement, you need to deposit:",
+                periodEnded: "Assessment period has ended",
+                dailyPlanDesc: "Deposit the same amount every day from today until the assessment ends",
+                downloadResult: "Download Result Image",
+                downloading: "Generating...",
+                viewOfficialFAQ: "View Official FAQ",
+            }
+        };
+
+        let currentLang = localStorage.getItem('hsbc-calculator-lang') || 'zh';
+        let depositMode = 'single';
+        let remittanceCount = 0;
+        let calculationResult = null;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            updateLanguage();
+            loadSavedData();
+        });
+
+        function toggleLanguage() {
+            currentLang = currentLang === 'zh' ? 'en' : 'zh';
+            localStorage.setItem('hsbc-calculator-lang', currentLang);
+            updateLanguage();
+        }
+
+        // Save data to localStorage
+        function saveData() {
+            const openingDate = document.getElementById('openingDate').value;
+            const remittanceItems = document.querySelectorAll('.remittance-item');
+            const remittances = [];
+
+            remittanceItems.forEach(item => {
+                const dateInput = item.querySelector('.remittance-date');
+                const amountInput = item.querySelector('.remittance-amount');
+                if (dateInput.value || amountInput.value) {
+                    remittances.push({
+                        date: dateInput.value,
+                        amount: amountInput.value
+                    });
+                }
+            });
+
+            const data = {
+                openingDate: openingDate,
+                remittances: remittances,
+                depositMode: depositMode
+            };
+
+            localStorage.setItem('hsbc-calculator-data', JSON.stringify(data));
+        }
+
+        // Load data from localStorage
+        function loadSavedData() {
+            const savedData = localStorage.getItem('hsbc-calculator-data');
+            if (savedData) {
+                const data = JSON.parse(savedData);
+
+                // Restore opening date
+                if (data.openingDate) {
+                    document.getElementById('openingDate').value = data.openingDate;
+                }
+
+                // Restore deposit mode
+                if (data.depositMode) {
+                    depositMode = data.depositMode;
+                    document.getElementById('modeSingle').classList.toggle('active', depositMode === 'single');
+                    document.getElementById('modeDaily').classList.toggle('active', depositMode === 'daily');
+                }
+
+                // Restore remittances
+                if (data.remittances && data.remittances.length > 0) {
+                    const container = document.getElementById('remittanceList');
+                    const emptyState = document.getElementById('emptyState');
+                    emptyState.style.display = 'none';
+
+                    data.remittances.forEach(remittance => {
+                        remittanceCount++;
+                        const div = document.createElement('div');
+                        div.className = 'remittance-item flex gap-3 items-start bg-gray-50 rounded-xl p-3';
+                        div.id = `remittance-${remittanceCount}`;
+                        div.innerHTML = `
+                            <div class="flex-1">
+                                <input
+                                    type="date"
+                                    class="remittance-date input-focus-ring w-full px-3 py-2 rounded-lg border border-claude-border bg-white text-sm text-claude-text transition-all duration-200"
+                                    value="${remittance.date || ''}"
+                                    onchange="saveData()"
+                                >
+                            </div>
+                            <div class="flex-1">
+                                <div class="relative">
+                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-claude-text-muted text-sm">$</span>
+                                    <input
+                                        type="number"
+                                        class="remittance-amount input-focus-ring w-full pl-7 pr-3 py-2 rounded-lg border border-claude-border bg-white text-sm text-claude-text transition-all duration-200"
+                                        placeholder="HKD"
+                                        min="0"
+                                        step="1"
+                                        value="${remittance.amount || ''}"
+                                        oninput="saveData()"
+                                    >
+                                </div>
+                            </div>
+                            <button
+                                onclick="removeRemittance(${remittanceCount})"
+                                class="flex-shrink-0 p-2 text-claude-text-muted hover:text-red-500 transition-colors rounded-lg hover:bg-red-50"
+                            >
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                </svg>
+                            </button>
+                        `;
+                        container.appendChild(div);
+                    });
+                } else {
+                    // Add one empty remittance row if no saved data
+                    addRemittance();
+                }
+            } else {
+                // Add one empty remittance row if no saved data
+                addRemittance();
+            }
+        }
+
+        function updateLanguage() {
+            const t = translations[currentLang];
+
+            // Update all elements with data-i18n attribute
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (t[key]) {
+                    el.textContent = t[key];
+                }
+            });
+
+            // Update lang button text
+            document.getElementById('langText').textContent = t.langButton;
+
+            // Update document lang
+            document.documentElement.lang = currentLang === 'zh' ? 'zh-CN' : 'en';
+        }
+
+        function getTranslation(key, replacements = {}) {
+            let text = translations[currentLang][key] || key;
+            Object.keys(replacements).forEach(key => {
+                text = text.replace(`{${key}}`, replacements[key]);
+            });
+            return text;
+        }
+
+        function setDepositMode(mode) {
+            depositMode = mode;
+
+            // Update toggle buttons
+            document.getElementById('modeSingle').classList.toggle('active', mode === 'single');
+            document.getElementById('modeDaily').classList.toggle('active', mode === 'daily');
+
+            // Show/hide results
+            document.getElementById('singleDepositResult').classList.toggle('hidden', mode !== 'single');
+            document.getElementById('dailyDepositResult').classList.toggle('hidden', mode !== 'daily');
+
+            // Save data
+            saveData();
+
+            // Recalculate display if we have results
+            if (calculationResult) {
+                displayResults();
+            }
+        }
+
+        function addRemittance() {
+            remittanceCount++;
+            const container = document.getElementById('remittanceList');
+            const emptyState = document.getElementById('emptyState');
+
+            emptyState.style.display = 'none';
+
+            const div = document.createElement('div');
+            div.className = 'remittance-item flex gap-3 items-start bg-gray-50 rounded-xl p-3';
+            div.id = `remittance-${remittanceCount}`;
+            div.innerHTML = `
+                <div class="flex-1">
+                    <input
+                        type="date"
+                        class="remittance-date input-focus-ring w-full px-3 py-2 rounded-lg border border-claude-border bg-white text-sm text-claude-text transition-all duration-200"
+                        onchange="saveData()"
+                    >
+                </div>
+                <div class="flex-1">
+                    <div class="relative">
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-claude-text-muted text-sm">$</span>
+                        <input
+                            type="number"
+                            class="remittance-amount input-focus-ring w-full pl-7 pr-3 py-2 rounded-lg border border-claude-border bg-white text-sm text-claude-text transition-all duration-200"
+                            placeholder="HKD"
+                            min="0"
+                            step="1"
+                            oninput="saveData()"
+                        >
+                    </div>
+                </div>
+                <button
+                    onclick="removeRemittance(${remittanceCount})"
+                    class="flex-shrink-0 p-2 text-claude-text-muted hover:text-red-500 transition-colors rounded-lg hover:bg-red-50"
+                >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                    </svg>
+                </button>
+            `;
+            container.appendChild(div);
+
+            // Save data after adding
+            saveData();
+        }
+
+        function removeRemittance(id) {
+            const element = document.getElementById(`remittance-${id}`);
+            if (element) {
+                element.remove();
+            }
+
+            const container = document.getElementById('remittanceList');
+            if (container.children.length === 0) {
+                document.getElementById('emptyState').style.display = 'block';
+            }
+
+            // Save data after removing
+            saveData();
+        }
+
+        function calculate() {
+            const openingDateInput = document.getElementById('openingDate').value;
+            if (!openingDateInput) {
+                alert(getTranslation(currentLang === 'zh' ? '请输入开户日期' : 'Please enter account opening date'));
+                return;
+            }
+
+            const openingDate = new Date(openingDateInput);
+            const assessmentStart = new Date(openingDate.getFullYear(), openingDate.getMonth() + 1, 1);
+            const assessmentEnd = new Date(assessmentStart.getFullYear(), assessmentStart.getMonth() + 3, 0);
+
+            const totalDays = Math.floor((assessmentEnd - assessmentStart) / (1000 * 60 * 60 * 24)) + 1;
+            const requiredBalanceDays = 10000 * totalDays;
+
+            // Get remittances
+            const remittanceItems = document.querySelectorAll('.remittance-item');
+            let currentBalanceDays = 0;
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            remittanceItems.forEach(item => {
+                const dateInput = item.querySelector('.remittance-date');
+                const amountInput = item.querySelector('.remittance-amount');
+
+                if (dateInput.value && amountInput.value) {
+                    const remitDate = new Date(dateInput.value);
+                    const amount = parseFloat(amountInput.value);
+
+                    if (remitDate >= assessmentStart && remitDate <= assessmentEnd) {
+                        const daysFromRemitToEnd = Math.floor((assessmentEnd - remitDate) / (1000 * 60 * 60 * 24)) + 1;
+                        currentBalanceDays += amount * daysFromRemitToEnd;
+                    } else if (remitDate < assessmentStart) {
+                        currentBalanceDays += amount * totalDays;
+                    }
+                }
+            });
+
+            const remainingBalanceDays = Math.max(0, requiredBalanceDays - currentBalanceDays);
+            const daysRemaining = Math.max(0, Math.floor((assessmentEnd - today) / (1000 * 60 * 60 * 24)) + 1);
+
+            // Calculate daily breakdown
+            const dailyBreakdown = [];
+            if (daysRemaining > 0 && remainingBalanceDays > 0) {
+                for (let i = 0; i <= daysRemaining; i++) {
+                    const depositDate = new Date(today);
+                    depositDate.setDate(depositDate.getDate() + i);
+                    if (depositDate > assessmentEnd) break;
+
+                    const daysFromDepositToEnd = Math.floor((assessmentEnd - depositDate) / (1000 * 60 * 60 * 24)) + 1;
+                    const requiredAmount = Math.ceil(remainingBalanceDays / daysFromDepositToEnd);
+                    dailyBreakdown.push({
+                        date: depositDate,
+                        daysToEnd: daysFromDepositToEnd,
+                        requiredAmount: requiredAmount,
+                        isToday: i === 0
+                    });
+                }
+            }
+
+            // Calculate daily deposit mode
+            let dailyDepositAmount = 0;
+            if (daysRemaining > 0 && remainingBalanceDays > 0) {
+                // Sum of arithmetic series: n + (n-1) + ... + 1 = n(n+1)/2
+                const sumOfSeries = daysRemaining * (daysRemaining + 1) / 2;
+                dailyDepositAmount = Math.ceil(remainingBalanceDays / sumOfSeries);
+            }
+
+            calculationResult = {
+                assessmentStart,
+                assessmentEnd,
+                totalDays,
+                requiredBalanceDays,
+                currentBalanceDays,
+                remainingBalanceDays,
+                daysRemaining,
+                dailyBreakdown,
+                dailyDepositAmount,
+                today
+            };
+
+            displayResults();
+        }
+
+        function displayResults() {
+            if (!calculationResult) return;
+
+            const {
+                assessmentStart,
+                assessmentEnd,
+                totalDays,
+                requiredBalanceDays,
+                currentBalanceDays,
+                remainingBalanceDays,
+                daysRemaining,
+                dailyBreakdown,
+                dailyDepositAmount,
+                today
+            } = calculationResult;
+
+            // Update basic info
+            document.getElementById('periodStart').textContent = formatDate(assessmentStart);
+            document.getElementById('periodEnd').textContent = formatDate(assessmentEnd);
+            document.getElementById('totalDays').textContent = totalDays + (currentLang === 'zh' ? ' 天' : ' days');
+            document.getElementById('requiredBalanceDays').textContent = formatNumber(requiredBalanceDays);
+            document.getElementById('currentBalanceDays').textContent = formatNumber(currentBalanceDays);
+            document.getElementById('remainingBalanceDays').textContent = formatNumber(remainingBalanceDays);
+
+            // Show results section
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.classList.add('visible');
+
+            // Enable download button
+            document.getElementById('downloadBtn').disabled = false;
+
+            // Show/hide success or recommendation cards
+            const successCard = document.getElementById('successCard');
+
+            if (remainingBalanceDays === 0) {
+                successCard.classList.remove('hidden');
+                document.getElementById('singleDepositResult').classList.add('hidden');
+                document.getElementById('dailyDepositResult').classList.add('hidden');
+                document.querySelector('.bg-claude-card.rounded-2xl.shadow-sm.border').classList.add('hidden');
+            } else {
+                successCard.classList.add('hidden');
+                document.querySelector('.bg-claude-card.rounded-2xl.shadow-sm.border').classList.remove('hidden');
+
+                // Single deposit mode display
+                const recommendationText = document.getElementById('recommendationText');
+                const requiredDepositEl = document.getElementById('requiredDeposit');
+
+                if (today > assessmentEnd) {
+                    recommendationText.textContent = getTranslation('periodEnded');
+                    requiredDepositEl.textContent = 'N/A';
+                } else {
+                    recommendationText.textContent = getTranslation('daysRemainingText', { days: daysRemaining }) +
+                        '。' + getTranslation('depositTodayText');
+                    const todayRequired = dailyBreakdown.length > 0 ? dailyBreakdown[0].requiredAmount : 0;
+                    requiredDepositEl.textContent = 'HKD $' + formatNumber(todayRequired);
+                }
+
+                // Daily breakdown table
+                const tbody = document.getElementById('dailyBreakdownBody');
+                tbody.innerHTML = '';
+                dailyBreakdown.forEach((day, index) => {
+                    const row = document.createElement('tr');
+                    row.className = `daily-row ${day.isToday ? 'today' : ''}`;
+                    row.innerHTML = `
+                        <td class="py-2 px-3 text-claude-text">
+                            ${formatDate(day.date)}
+                            ${day.isToday ? '<span class="ml-1 text-xs text-claude-accent font-medium">(' + getTranslation('today') + ')</span>' : ''}
+                        </td>
+                        <td class="py-2 px-3 text-right text-claude-text-muted">${day.daysToEnd}</td>
+                        <td class="py-2 px-3 text-right font-semibold text-claude-accent">$${formatNumber(day.requiredAmount)}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+
+                // Daily deposit mode display
+                const dailyPlanText = document.getElementById('dailyPlanText');
+                const dailyDepositAmountEl = document.getElementById('dailyDepositAmount');
+
+                dailyPlanText.textContent = getTranslation('dailyPlanDesc');
+                dailyDepositAmountEl.textContent = 'HKD $' + formatNumber(dailyDepositAmount);
+
+                // Plan summary
+                const totalDeposit = dailyDepositAmount * daysRemaining;
+                const accumulated = dailyDepositAmount * (daysRemaining * (daysRemaining + 1) / 2);
+
+                document.getElementById('planDaysRemaining').textContent = daysRemaining + (currentLang === 'zh' ? ' 天' : ' days');
+                document.getElementById('planTotalNeeded').textContent = 'HKD $' + formatNumber(totalDeposit);
+                document.getElementById('planAccumulated').textContent = formatNumber(accumulated) + (currentLang === 'zh' ? ' 余额天数' : ' balance-days');
+
+                // Show current mode
+                if (depositMode === 'single') {
+                    document.getElementById('singleDepositResult').classList.remove('hidden');
+                    document.getElementById('dailyDepositResult').classList.add('hidden');
+                } else {
+                    document.getElementById('singleDepositResult').classList.add('hidden');
+                    document.getElementById('dailyDepositResult').classList.remove('hidden');
+                }
+            }
+        }
+
+        function formatDate(date) {
+            if (currentLang === 'zh') {
+                return date.toLocaleDateString('zh-CN', { year: 'numeric', month: 'short', day: 'numeric' });
+            }
+            return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+        }
+
+        function formatNumber(num) {
+            return num.toLocaleString(currentLang === 'zh' ? 'zh-CN' : 'en-US');
+        }
+
+        // Download result as image
+        function downloadResultImage() {
+            const resultsElement = document.getElementById('results');
+            const downloadBtn = document.getElementById('downloadBtn');
+            const originalText = downloadBtn.querySelector('span').textContent;
+
+            // Find the daily table container and temporarily expand it
+            const dailyTable = document.querySelector('.daily-table');
+            const originalMaxHeight = dailyTable ? dailyTable.style.maxHeight : null;
+            const originalOverflow = dailyTable ? dailyTable.style.overflowY : null;
+
+            if (dailyTable) {
+                dailyTable.style.maxHeight = 'none';
+                dailyTable.style.overflowY = 'visible';
+            }
+
+            // Show loading state
+            downloadBtn.querySelector('span').textContent = getTranslation('downloading');
+            downloadBtn.disabled = true;
+
+            html2canvas(resultsElement, {
+                backgroundColor: '#FAFAF8',
+                scale: 2,
+                scrollX: 0,
+                scrollY: 0,
+                windowWidth: resultsElement.scrollWidth,
+                windowHeight: resultsElement.scrollHeight
+            }).then(canvas => {
+                // Restore original styles
+                if (dailyTable) {
+                    dailyTable.style.maxHeight = originalMaxHeight || '400px';
+                    dailyTable.style.overflowY = originalOverflow || 'auto';
+                }
+
+                const link = document.createElement('a');
+                const date = new Date().toISOString().split('T')[0];
+                link.download = `hsbc-one-calculation-${date}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+
+                // Reset button
+                downloadBtn.querySelector('span').textContent = originalText;
+                downloadBtn.disabled = false;
+            }).catch(err => {
+                console.error('Download failed:', err);
+                // Restore original styles on error too
+                if (dailyTable) {
+                    dailyTable.style.maxHeight = originalMaxHeight || '400px';
+                    dailyTable.style.overflowY = originalOverflow || 'auto';
+                }
+                downloadBtn.querySelector('span').textContent = originalText;
+                downloadBtn.disabled = false;
+                alert(currentLang === 'zh' ? '下载失败，请重试' : 'Download failed, please try again');
+            });
+        }
+    </script>
+</body>
+</html>
