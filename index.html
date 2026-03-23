@@ -784,14 +784,34 @@
             const downloadBtn = document.getElementById('downloadBtn');
             const originalText = downloadBtn.querySelector('span').textContent;
 
+            // Find the daily table container and temporarily expand it
+            const dailyTable = document.querySelector('.daily-table');
+            const originalMaxHeight = dailyTable ? dailyTable.style.maxHeight : null;
+            const originalOverflow = dailyTable ? dailyTable.style.overflowY : null;
+
+            if (dailyTable) {
+                dailyTable.style.maxHeight = 'none';
+                dailyTable.style.overflowY = 'visible';
+            }
+
             // Show loading state
             downloadBtn.querySelector('span').textContent = getTranslation('downloading');
             downloadBtn.disabled = true;
 
             html2canvas(resultsElement, {
                 backgroundColor: '#FAFAF8',
-                scale: 2
+                scale: 2,
+                scrollX: 0,
+                scrollY: 0,
+                windowWidth: resultsElement.scrollWidth,
+                windowHeight: resultsElement.scrollHeight
             }).then(canvas => {
+                // Restore original styles
+                if (dailyTable) {
+                    dailyTable.style.maxHeight = originalMaxHeight || '400px';
+                    dailyTable.style.overflowY = originalOverflow || 'auto';
+                }
+
                 const link = document.createElement('a');
                 const date = new Date().toISOString().split('T')[0];
                 link.download = `hsbc-one-calculation-${date}.png`;
@@ -803,6 +823,11 @@
                 downloadBtn.disabled = false;
             }).catch(err => {
                 console.error('Download failed:', err);
+                // Restore original styles on error too
+                if (dailyTable) {
+                    dailyTable.style.maxHeight = originalMaxHeight || '400px';
+                    dailyTable.style.overflowY = originalOverflow || 'auto';
+                }
                 downloadBtn.querySelector('span').textContent = originalText;
                 downloadBtn.disabled = false;
                 alert(currentLang === 'zh' ? '下载失败，请重试' : 'Download failed, please try again');
