@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HSBC One 余额计算器</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Noto+Sans+SC:wght@400;500;600&display=swap" rel="stylesheet">
     <script>
         tailwind.config = {
@@ -337,8 +338,34 @@
             </div>
         </div>
 
+        <!-- Download Button -->
+        <div class="mt-4 text-center">
+            <button
+                id="downloadBtn"
+                onclick="downloadResultImage()"
+                class="inline-flex items-center gap-2 px-6 py-3 bg-white rounded-xl border border-claude-border shadow-sm hover:shadow-md transition-all text-claude-text font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled
+            >
+                <svg class="w-5 h-5 text-claude-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                </svg>
+                <span data-i18n="downloadResult">下载结果图片</span>
+            </button>
+        </div>
+
         <!-- Footer -->
-        <footer class="mt-10 text-center">
+        <footer class="mt-10 text-center space-y-3">
+            <a
+                href="https://www.hsbc.com.hk/content/dam/hsbc/hk/vam/pdf/HSBC_One_FAQ.pdf"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="inline-flex items-center gap-1 text-sm text-claude-accent hover:text-amber-700 transition-colors"
+            >
+                <span data-i18n="viewOfficialFAQ">查看官方常见问题</span>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                </svg>
+            </a>
             <p class="text-xs text-claude-text-muted" data-i18n="disclaimer">
                 本计算器仅供参考，请以汇丰银行官方要求为准
             </p>
@@ -391,6 +418,9 @@
                 depositTodayText: "要满足平均余额要求，您需要额外存款：",
                 periodEnded: "评估期已结束",
                 dailyPlanDesc: "从今天起每天存入相同金额，直到评估期结束",
+                downloadResult: "下载结果图片",
+                downloading: "生成中...",
+                viewOfficialFAQ: "查看官方常见问题",
             },
             en: {
                 title: "HSBC One Balance Calculator",
@@ -435,6 +465,9 @@
                 depositTodayText: "To meet the average balance requirement, you need to deposit:",
                 periodEnded: "Assessment period has ended",
                 dailyPlanDesc: "Deposit the same amount every day from today until the assessment ends",
+                downloadResult: "Download Result Image",
+                downloading: "Generating...",
+                viewOfficialFAQ: "View Official FAQ",
             }
         };
 
@@ -662,6 +695,9 @@
             const resultsDiv = document.getElementById('results');
             resultsDiv.classList.add('visible');
 
+            // Enable download button
+            document.getElementById('downloadBtn').disabled = false;
+
             // Show/hide success or recommendation cards
             const successCard = document.getElementById('successCard');
 
@@ -740,6 +776,37 @@
 
         function formatNumber(num) {
             return num.toLocaleString(currentLang === 'zh' ? 'zh-CN' : 'en-US');
+        }
+
+        // Download result as image
+        function downloadResultImage() {
+            const resultsElement = document.getElementById('results');
+            const downloadBtn = document.getElementById('downloadBtn');
+            const originalText = downloadBtn.querySelector('span').textContent;
+
+            // Show loading state
+            downloadBtn.querySelector('span').textContent = getTranslation('downloading');
+            downloadBtn.disabled = true;
+
+            html2canvas(resultsElement, {
+                backgroundColor: '#FAFAF8',
+                scale: 2
+            }).then(canvas => {
+                const link = document.createElement('a');
+                const date = new Date().toISOString().split('T')[0];
+                link.download = `hsbc-one-calculation-${date}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+
+                // Reset button
+                downloadBtn.querySelector('span').textContent = originalText;
+                downloadBtn.disabled = false;
+            }).catch(err => {
+                console.error('Download failed:', err);
+                downloadBtn.querySelector('span').textContent = originalText;
+                downloadBtn.disabled = false;
+                alert(currentLang === 'zh' ? '下载失败，请重试' : 'Download failed, please try again');
+            });
         }
     </script>
 </body>
