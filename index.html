@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HSBC One Balance Calculator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'claude-bg': '#FAFAF8',
+                        'claude-card': '#FFFFFF',
+                        'claude-accent': '#D97706',
+                        'claude-accent-light': '#FEF3C7',
+                        'claude-text': '#1F2937',
+                        'claude-text-muted': '#6B7280',
+                        'claude-border': '#E5E7EB',
+                    },
+                    fontFamily: {
+                        'display': ['Crimson Pro', 'serif'],
+                        'body': ['IBM Plex Sans', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'IBM Plex Sans', sans-serif;
+        }
+        .font-display {
+            font-family: 'Crimson Pro', serif;
+        }
+        .input-focus-ring:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.15);
+            border-color: #D97706;
+        }
+        .result-card {
+            opacity: 0;
+            transform: translateY(10px);
+            transition: opacity 0.4s ease, transform 0.4s ease;
+        }
+        .result-card.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .remittance-item {
+            transition: all 0.2s ease;
+        }
+        .remittance-item:hover {
+            background-color: #F9FAFB;
+        }
+        @keyframes pulse-subtle {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        .animate-pulse-subtle {
+            animation: pulse-subtle 2s ease-in-out infinite;
+        }
+    </style>
+</head>
+<body class="bg-claude-bg min-h-screen py-8 px-4">
+    <div class="max-w-2xl mx-auto">
+        <!-- Header -->
+        <header class="mb-10 text-center">
+            <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-claude-accent-light mb-4">
+                <svg class="w-6 h-6 text-claude-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                </svg>
+            </div>
+            <h1 class="font-display text-3xl font-semibold text-claude-text mb-2">HSBC One Balance Calculator</h1>
+            <p class="text-claude-text-muted text-sm max-w-md mx-auto leading-relaxed">
+                Calculate how much you need to remit to maintain the HKD $10,000 average balance for your first 3 months.
+            </p>
+        </header>
+
+        <!-- Main Card -->
+        <div class="bg-claude-card rounded-2xl shadow-sm border border-claude-border/50 p-6 md:p-8">
+            <!-- Account Opening Date -->
+            <div class="mb-8">
+                <label class="block text-sm font-medium text-claude-text mb-2">Account Opening Date</label>
+                <input
+                    type="date"
+                    id="openingDate"
+                    class="input-focus-ring w-full px-4 py-3 rounded-xl border border-claude-border bg-white text-claude-text transition-all duration-200"
+                >
+                <p class="text-xs text-claude-text-muted mt-2">Your assessment period starts from the first full calendar month after this date.</p>
+            </div>
+
+            <!-- Remittances Section -->
+            <div class="mb-8">
+                <div class="flex items-center justify-between mb-4">
+                    <label class="block text-sm font-medium text-claude-text">Remittance History</label>
+                    <button
+                        onclick="addRemittance()"
+                        class="text-sm text-claude-accent hover:text-amber-700 font-medium flex items-center gap-1 transition-colors"
+                    >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                        </svg>
+                        Add Remittance
+                    </button>
+                </div>
+
+                <div id="remittanceList" class="space-y-3">
+                    <!-- Remittance items will be added here -->
+                </div>
+
+                <div id="emptyState" class="text-center py-8 border border-dashed border-claude-border rounded-xl">
+                    <p class="text-claude-text-muted text-sm">No remittances added yet</p>
+                    <p class="text-claude-text-muted text-xs mt-1">Add your first remittance to start calculating</p>
+                </div>
+            </div>
+
+            <!-- Calculate Button -->
+            <button
+                onclick="calculate()"
+                class="w-full bg-claude-accent hover:bg-amber-700 text-white font-medium py-3.5 px-6 rounded-xl transition-all duration-200 shadow-sm hover:shadow-md active:scale-[0.98]"
+            >
+                Calculate Requirements
+            </button>
+        </div>
+
+        <!-- Results Section -->
+        <div id="results" class="result-card mt-6 space-y-4">
+            <!-- Assessment Period -->
+            <div class="bg-claude-card rounded-2xl shadow-sm border border-claude-border/50 p-6">
+                <h3 class="font-display text-lg font-medium text-claude-text mb-4">Assessment Period</h3>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="bg-amber-50 rounded-xl p-4">
+                        <p class="text-xs text-claude-text-muted uppercase tracking-wide mb-1">Start Date</p>
+                        <p id="periodStart" class="text-lg font-semibold text-claude-text">-</p>
+                    </div>
+                    <div class="bg-amber-50 rounded-xl p-4">
+                        <p class="text-xs text-claude-text-muted uppercase tracking-wide mb-1">End Date</p>
+                        <p id="periodEnd" class="text-lg font-semibold text-claude-text">-</p>
+                    </div>
+                </div>
+                <div class="mt-4 pt-4 border-t border-claude-border">
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm text-claude-text-muted">Total Assessment Days</span>
+                        <span id="totalDays" class="font-semibold text-claude-text">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Current Status -->
+            <div class="bg-claude-card rounded-2xl shadow-sm border border-claude-border/50 p-6">
+                <h3 class="font-display text-lg font-medium text-claude-text mb-4">Current Status</h3>
+                <div class="space-y-3">
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm text-claude-text-muted">Required Balance-Days</span>
+                        <span id="requiredBalanceDays" class="font-semibold text-claude-text">-</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm text-claude-text-muted">Current Balance-Days</span>
+                        <span id="currentBalanceDays" class="font-semibold text-claude-text">-</span>
+                    </div>
+                    <div class="flex justify-between items-center pt-3 border-t border-claude-border">
+                        <span class="text-sm text-claude-text-muted">Remaining Balance-Days Needed</span>
+                        <span id="remainingBalanceDays" class="font-semibold text-claude-accent">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recommendation -->
+            <div id="recommendationCard" class="bg-claude-accent rounded-2xl shadow-lg p-6 text-white">
+                <div class="flex items-start gap-4">
+                    <div class="flex-shrink-0">
+                        <svg class="w-6 h-6 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="font-display text-lg font-medium mb-2">Recommendation</h3>
+                        <p id="recommendationText" class="text-amber-100 text-sm leading-relaxed mb-4">-</p>
+                        <div class="bg-white/10 rounded-xl p-4">
+                            <p class="text-xs text-amber-200 mb-1">Additional Deposit Required</p>
+                            <p id="requiredDeposit" class="text-2xl font-bold">-</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Already Met -->
+            <div id="successCard" class="bg-green-600 rounded-2xl shadow-lg p-6 text-white hidden">
+                <div class="flex items-center gap-4">
+                    <div class="flex-shrink-0">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="font-display text-lg font-medium">Requirement Met!</h3>
+                        <p class="text-green-100 text-sm">Your current remittances satisfy the average balance requirement.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="mt-10 text-center">
+            <p class="text-xs text-claude-text-muted">
+                This calculator is for reference only. Please verify with HSBC for official requirements.
+            </p>
+        </footer>
+    </div>
+
+    <script>
+        let remittanceCount = 0;
+
+        // Initialize with one empty remittance row
+        document.addEventListener('DOMContentLoaded', () => {
+            addRemittance();
+        });
+
+        function addRemittance() {
+            remittanceCount++;
+            const container = document.getElementById('remittanceList');
+            const emptyState = document.getElementById('emptyState');
+
+            emptyState.style.display = 'none';
+
+            const div = document.createElement('div');
+            div.className = 'remittance-item flex gap-3 items-start bg-gray-50 rounded-xl p-3';
+            div.id = `remittance-${remittanceCount}`;
+            div.innerHTML = `
+                <div class="flex-1">
+                    <input
+                        type="date"
+                        class="remittance-date input-focus-ring w-full px-3 py-2 rounded-lg border border-claude-border bg-white text-sm text-claude-text transition-all duration-200"
+                        placeholder="Date"
+                    >
+                </div>
+                <div class="flex-1">
+                    <div class="relative">
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-claude-text-muted text-sm">$</span>
+                        <input
+                            type="number"
+                            class="remittance-amount input-focus-ring w-full pl-7 pr-3 py-2 rounded-lg border border-claude-border bg-white text-sm text-claude-text transition-all duration-200"
+                            placeholder="Amount (HKD)"
+                            min="0"
+                            step="1"
+                        >
+                    </div>
+                </div>
+                <button
+                    onclick="removeRemittance(${remittanceCount})"
+                    class="flex-shrink-0 p-2 text-claude-text-muted hover:text-red-500 transition-colors rounded-lg hover:bg-red-50"
+                >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                    </svg>
+                </button>
+            `;
+            container.appendChild(div);
+        }
+
+        function removeRemittance(id) {
+            const element = document.getElementById(`remittance-${id}`);
+            if (element) {
+                element.remove();
+            }
+
+            // Check if empty
+            const container = document.getElementById('remittanceList');
+            if (container.children.length === 0) {
+                document.getElementById('emptyState').style.display = 'block';
+            }
+        }
+
+        function calculate() {
+            const openingDateInput = document.getElementById('openingDate').value;
+            if (!openingDateInput) {
+                alert('Please enter your account opening date');
+                return;
+            }
+
+            const openingDate = new Date(openingDateInput);
+
+            // Calculate assessment period (first 3 full calendar months after opening)
+            // Assessment starts from the 1st of the month after opening
+            const assessmentStart = new Date(openingDate.getFullYear(), openingDate.getMonth() + 1, 1);
+            const assessmentEnd = new Date(assessmentStart.getFullYear(), assessmentStart.getMonth() + 3, 0);
+
+            const totalDays = Math.floor((assessmentEnd - assessmentStart) / (1000 * 60 * 60 * 24)) + 1;
+            const requiredBalanceDays = 10000 * totalDays;
+
+            // Get remittances
+            const remittanceItems = document.querySelectorAll('.remittance-item');
+            let currentBalanceDays = 0;
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            remittanceItems.forEach(item => {
+                const dateInput = item.querySelector('.remittance-date');
+                const amountInput = item.querySelector('.remittance-amount');
+
+                if (dateInput.value && amountInput.value) {
+                    const remitDate = new Date(dateInput.value);
+                    const amount = parseFloat(amountInput.value);
+
+                    // Only count if remittance is within assessment period
+                    if (remitDate >= assessmentStart && remitDate <= assessmentEnd) {
+                        const daysFromRemitToEnd = Math.floor((assessmentEnd - remitDate) / (1000 * 60 * 60 * 24)) + 1;
+                        currentBalanceDays += amount * daysFromRemitToEnd;
+                    } else if (remitDate < assessmentStart) {
+                        // If remitted before assessment, counts for full period
+                        currentBalanceDays += amount * totalDays;
+                    }
+                }
+            });
+
+            // Calculate remaining requirement
+            const remainingBalanceDays = Math.max(0, requiredBalanceDays - currentBalanceDays);
+
+            // Calculate days remaining from today to end of assessment
+            const daysRemaining = Math.max(0, Math.floor((assessmentEnd - today) / (1000 * 60 * 60 * 24)) + 1);
+
+            // Calculate required additional deposit
+            let requiredDeposit = 0;
+            if (daysRemaining > 0 && remainingBalanceDays > 0) {
+                requiredDeposit = Math.ceil(remainingBalanceDays / daysRemaining);
+            }
+
+            // Update UI
+            document.getElementById('periodStart').textContent = formatDate(assessmentStart);
+            document.getElementById('periodEnd').textContent = formatDate(assessmentEnd);
+            document.getElementById('totalDays').textContent = totalDays + ' days';
+            document.getElementById('requiredBalanceDays').textContent = formatNumber(requiredBalanceDays);
+            document.getElementById('currentBalanceDays').textContent = formatNumber(currentBalanceDays);
+            document.getElementById('remainingBalanceDays').textContent = formatNumber(remainingBalanceDays);
+
+            // Show/hide appropriate cards
+            const resultsDiv = document.getElementById('results');
+            const recommendationCard = document.getElementById('recommendationCard');
+            const successCard = document.getElementById('successCard');
+
+            resultsDiv.classList.add('visible');
+
+            if (remainingBalanceDays === 0) {
+                recommendationCard.classList.add('hidden');
+                successCard.classList.remove('hidden');
+            } else {
+                successCard.classList.add('hidden');
+                recommendationCard.classList.remove('hidden');
+
+                // Update recommendation text
+                const recommendationText = document.getElementById('recommendationText');
+                if (today > assessmentEnd) {
+                    recommendationText.textContent = `The assessment period has ended. You needed to maintain an average of HKD $10,000 over ${totalDays} days.`;
+                    document.getElementById('requiredDeposit').textContent = 'N/A';
+                } else if (daysRemaining > 0) {
+                    recommendationText.textContent = `You have ${daysRemaining} days remaining in the assessment period. To meet the average balance requirement, you need to deposit an additional:`;
+                    document.getElementById('requiredDeposit').textContent = 'HKD $' + formatNumber(requiredDeposit);
+                } else {
+                    recommendationText.textContent = 'Assessment period is ending soon. Please check your balance status.';
+                }
+            }
+        }
+
+        function formatDate(date) {
+            const options = { year: 'numeric', month: 'short', day: 'numeric' };
+            return date.toLocaleDateString('en-US', options);
+        }
+
+        function formatNumber(num) {
+            return num.toLocaleString('en-US');
+        }
+    </script>
+</body>
+</html>
