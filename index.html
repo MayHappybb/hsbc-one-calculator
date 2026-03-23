@@ -65,12 +65,27 @@
             display: flex;
             flex-direction: row;
             gap: 8px;
+            flex-wrap: nowrap;
         }
         .remittance-item > div {
             flex: 1;
             min-width: 0;
         }
+        .remittance-date, .remittance-amount {
+            width: 100%;
+            box-sizing: border-box;
+        }
+        @media (max-width: 640px) {
+            #openingDate {
+                font-size: 14px;
+                max-width: 100%;
+                box-sizing: border-box;
+            }
+        }
         @media (max-width: 480px) {
+            .remittance-item {
+                flex-wrap: nowrap;
+            }
             .remittance-date, .remittance-amount {
                 height: 32px;
                 min-height: 32px;
@@ -125,6 +140,7 @@
         #openingDate {
             max-width: 100%;
             font-size: 16px;
+            box-sizing: border-box;
         }
         @media (max-width: 640px) {
             #openingDate {
