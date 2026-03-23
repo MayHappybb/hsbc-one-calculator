@@ -135,6 +135,7 @@
                     type="date"
                     id="openingDate"
                     class="input-focus-ring w-full px-4 py-3 rounded-xl border border-claude-border bg-white text-claude-text transition-all duration-200"
+                    onchange="saveData()"
                 >
                 <p class="text-xs text-claude-text-muted mt-2" data-i18n="accountOpeningHint">您的评估期从该日期下个月的1号开始计算</p>
             </div>
@@ -479,13 +480,112 @@
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             updateLanguage();
-            addRemittance();
+            loadSavedData();
         });
 
         function toggleLanguage() {
             currentLang = currentLang === 'zh' ? 'en' : 'zh';
             localStorage.setItem('hsbc-calculator-lang', currentLang);
             updateLanguage();
+        }
+
+        // Save data to localStorage
+        function saveData() {
+            const openingDate = document.getElementById('openingDate').value;
+            const remittanceItems = document.querySelectorAll('.remittance-item');
+            const remittances = [];
+
+            remittanceItems.forEach(item => {
+                const dateInput = item.querySelector('.remittance-date');
+                const amountInput = item.querySelector('.remittance-amount');
+                if (dateInput.value || amountInput.value) {
+                    remittances.push({
+                        date: dateInput.value,
+                        amount: amountInput.value
+                    });
+                }
+            });
+
+            const data = {
+                openingDate: openingDate,
+                remittances: remittances,
+                depositMode: depositMode
+            };
+
+            localStorage.setItem('hsbc-calculator-data', JSON.stringify(data));
+        }
+
+        // Load data from localStorage
+        function loadSavedData() {
+            const savedData = localStorage.getItem('hsbc-calculator-data');
+            if (savedData) {
+                const data = JSON.parse(savedData);
+
+                // Restore opening date
+                if (data.openingDate) {
+                    document.getElementById('openingDate').value = data.openingDate;
+                }
+
+                // Restore deposit mode
+                if (data.depositMode) {
+                    depositMode = data.depositMode;
+                    document.getElementById('modeSingle').classList.toggle('active', depositMode === 'single');
+                    document.getElementById('modeDaily').classList.toggle('active', depositMode === 'daily');
+                }
+
+                // Restore remittances
+                if (data.remittances && data.remittances.length > 0) {
+                    const container = document.getElementById('remittanceList');
+                    const emptyState = document.getElementById('emptyState');
+                    emptyState.style.display = 'none';
+
+                    data.remittances.forEach(remittance => {
+                        remittanceCount++;
+                        const div = document.createElement('div');
+                        div.className = 'remittance-item flex gap-3 items-start bg-gray-50 rounded-xl p-3';
+                        div.id = `remittance-${remittanceCount}`;
+                        div.innerHTML = `
+                            <div class="flex-1">
+                                <input
+                                    type="date"
+                                    class="remittance-date input-focus-ring w-full px-3 py-2 rounded-lg border border-claude-border bg-white text-sm text-claude-text transition-all duration-200"
+                                    value="${remittance.date || ''}"
+                                    onchange="saveData()"
+                                >
+                            </div>
+                            <div class="flex-1">
+                                <div class="relative">
+                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-claude-text-muted text-sm">$</span>
+                                    <input
+                                        type="number"
+                                        class="remittance-amount input-focus-ring w-full pl-7 pr-3 py-2 rounded-lg border border-claude-border bg-white text-sm text-claude-text transition-all duration-200"
+                                        placeholder="HKD"
+                                        min="0"
+                                        step="1"
+                                        value="${remittance.amount || ''}"
+                                        oninput="saveData()"
+                                    >
+                                </div>
+                            </div>
+                            <button
+                                onclick="removeRemittance(${remittanceCount})"
+                                class="flex-shrink-0 p-2 text-claude-text-muted hover:text-red-500 transition-colors rounded-lg hover:bg-red-50"
+                            >
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                </svg>
+                            </button>
+                        `;
+                        container.appendChild(div);
+                    });
+                } else {
+                    // Add one empty remittance row if no saved data
+                    addRemittance();
+                }
+            } else {
+                // Add one empty remittance row if no saved data
+                addRemittance();
+            }
         }
 
         function updateLanguage() {
@@ -525,6 +625,9 @@
             document.getElementById('singleDepositResult').classList.toggle('hidden', mode !== 'single');
             document.getElementById('dailyDepositResult').classList.toggle('hidden', mode !== 'daily');
 
+            // Save data
+            saveData();
+
             // Recalculate display if we have results
             if (calculationResult) {
                 displayResults();
@@ -546,6 +649,7 @@
                     <input
                         type="date"
                         class="remittance-date input-focus-ring w-full px-3 py-2 rounded-lg border border-claude-border bg-white text-sm text-claude-text transition-all duration-200"
+                        onchange="saveData()"
                     >
                 </div>
                 <div class="flex-1">
@@ -557,6 +661,7 @@
                             placeholder="HKD"
                             min="0"
                             step="1"
+                            oninput="saveData()"
                         >
                     </div>
                 </div>
@@ -570,6 +675,9 @@
                 </button>
             `;
             container.appendChild(div);
+
+            // Save data after adding
+            saveData();
         }
 
         function removeRemittance(id) {
@@ -582,6 +690,9 @@
             if (container.children.length === 0) {
                 document.getElementById('emptyState').style.display = 'block';
             }
+
+            // Save data after removing
+            saveData();
         }
 
         function calculate() {
