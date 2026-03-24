@@ -55,6 +55,28 @@
         .remittance-item:hover {
             background-color: #F9FAFB;
         }
+        .withdrawal-item {
+            display: flex;
+            flex-direction: row;
+            gap: 8px;
+            flex-wrap: nowrap !important;
+            align-items: center;
+            transition: all 0.2s ease;
+        }
+        .withdrawal-item:hover {
+            background-color: #FEE2E2;
+        }
+        .withdrawal-date, .withdrawal-amount {
+            height: 36px;
+            min-height: 36px;
+            font-size: 14px;
+            box-sizing: border-box;
+            width: 100%;
+        }
+        .withdrawal-item > div {
+            flex: 1;
+            min-width: 0;
+        }
         .remittance-date, .remittance-amount {
             height: 36px;
             min-height: 36px;
@@ -121,6 +143,27 @@
                 width: 100% !important;
                 min-width: 0 !important;
             }
+            /* Withdrawal items mobile styles */
+            .withdrawal-item {
+                flex-wrap: nowrap !important;
+                align-items: center;
+                gap: 4px;
+                padding: 8px !important;
+            }
+            .withdrawal-item > div {
+                min-width: 0;
+            }
+            .withdrawal-date, .withdrawal-amount {
+                height: 32px !important;
+                min-height: 32px !important;
+                font-size: 13px;
+                padding-left: 6px;
+                padding-right: 6px;
+            }
+            .withdrawal-date {
+                width: 100% !important;
+                min-width: 0 !important;
+            }
         }
         /* Reduce card padding on mobile */
         @media (max-width: 400px) {
@@ -135,6 +178,19 @@
         .toggle-btn.active {
             background-color: #D97706;
             color: white;
+        }
+        .preset-btn {
+            transition: all 0.2s ease;
+            text-align: center;
+            line-height: 1.3;
+        }
+        .preset-btn.active {
+            background-color: #D97706;
+            color: white;
+            border-color: #D97706;
+        }
+        .preset-btn.active span {
+            color: rgba(255, 255, 255, 0.8) !important;
         }
         .daily-table {
             max-height: 400px;
@@ -213,6 +269,40 @@
 
         <!-- Main Card -->
         <div class="bg-claude-card rounded-2xl shadow-sm border border-claude-border/50 p-6 md:p-8 overflow-hidden">
+            <!-- Required Balance -->
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-claude-text mb-2" data-i18n="requiredBalanceLabel">余额要求</label>
+                <div class="flex gap-2 mb-3">
+                    <button
+                        id="presetOne"
+                        onclick="setPresetBalance(10000)"
+                        class="preset-btn active flex-1 py-2 px-3 rounded-lg border border-claude-border text-sm font-medium transition-all"
+                    >
+                        HSBC One<br><span class="text-xs text-claude-text-muted">$10,000</span>
+                    </button>
+                    <button
+                        id="presetPremier"
+                        onclick="setPresetBalance(1000000)"
+                        class="preset-btn flex-1 py-2 px-3 rounded-lg border border-claude-border text-sm font-medium transition-all"
+                    >
+                        HSBC Premier<br><span class="text-xs text-claude-text-muted">$1,000,000</span>
+                    </button>
+                </div>
+                <div class="relative">
+                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-claude-text-muted text-sm">$</span>
+                    <input
+                        type="number"
+                        id="requiredBalanceInput"
+                        class="input-focus-ring w-full pl-7 pr-4 py-3 rounded-xl border border-claude-border bg-white text-claude-text transition-all duration-200"
+                        min="0"
+                        step="1000"
+                        value="10000"
+                        oninput="onBalanceInput()"
+                    >
+                </div>
+                <p class="text-xs text-claude-text-muted mt-2" data-i18n="requiredBalanceHint">需维持的平均余额金额（港币）</p>
+            </div>
+
             <!-- Account Opening Date -->
             <div class="mb-8 overflow-hidden">
                 <label class="block text-sm font-medium text-claude-text mb-2" data-i18n="accountOpeningDate">开户日期</label>
@@ -249,6 +339,31 @@
                 <div id="emptyState" class="text-center py-8 border border-dashed border-claude-border rounded-xl">
                     <p class="text-claude-text-muted text-sm" data-i18n="noRemittances">尚未添加汇款</p>
                     <p class="text-claude-text-muted text-xs mt-1" data-i18n="addFirstRemittance">添加第一笔汇款开始计算</p>
+                </div>
+            </div>
+
+            <!-- Withdrawals Section -->
+            <div class="mb-8">
+                <div class="flex items-center justify-between mb-4">
+                    <label class="block text-sm font-medium text-claude-text" data-i18n="withdrawalHistory">支出记录</label>
+                    <button
+                        onclick="addWithdrawal()"
+                        class="text-sm text-claude-accent hover:text-amber-700 font-medium flex items-center gap-1 transition-colors"
+                    >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                        </svg>
+                        <span data-i18n="addWithdrawal">添加支出</span>
+                    </button>
+                </div>
+
+                <div id="withdrawalList" class="space-y-3">
+                    <!-- Withdrawal items will be added here -->
+                </div>
+
+                <div id="emptyWithdrawalState" class="text-center py-8 border border-dashed border-claude-border rounded-xl">
+                    <p class="text-claude-text-muted text-sm" data-i18n="noWithdrawals">尚未添加支出</p>
+                    <p class="text-claude-text-muted text-xs mt-1" data-i18n="addFirstWithdrawal">添加支出记录以获得更准确的计算</p>
                 </div>
             </div>
 
@@ -464,14 +579,20 @@
         // Translation dictionary
         const translations = {
             zh: {
-                title: "HSBC One 余额计算器",
-                subtitle: "计算您需要汇款多少才能满足前3个月平均余额港币$10,000的要求",
+                title: "HSBC 余额计算器",
+                subtitle: "计算您需要汇款多少才能满足前3个月平均余额要求",
+                requiredBalanceLabel: "余额要求",
+                requiredBalanceHint: "需维持的平均余额金额（港币）",
                 accountOpeningDate: "开户日期",
                 accountOpeningHint: "您的评估期从该日期下个月的1号开始计算",
                 remittanceHistory: "汇款记录",
                 addRemittance: "添加汇款",
                 noRemittances: "尚未添加汇款",
                 addFirstRemittance: "添加第一笔汇款开始计算",
+                withdrawalHistory: "支出记录",
+                addWithdrawal: "添加支出",
+                noWithdrawals: "尚未添加支出",
+                addFirstWithdrawal: "添加支出记录以获得更准确的计算",
                 calculate: "计算需求",
                 assessmentPeriod: "评估期间",
                 startDate: "开始日期",
@@ -511,14 +632,20 @@
                 viewOfficialFAQ: "查看官方常见问题",
             },
             en: {
-                title: "HSBC One Balance Calculator",
-                subtitle: "Calculate how much you need to remit to meet the HKD $10,000 average balance requirement",
+                title: "HSBC Balance Calculator",
+                subtitle: "Calculate how much you need to remit to meet the 3-month average balance requirement",
+                requiredBalanceLabel: "Balance Requirement",
+                requiredBalanceHint: "Average balance to maintain (HKD)",
                 accountOpeningDate: "Account Opening Date",
                 accountOpeningHint: "Your assessment period starts from the 1st of the next month",
                 remittanceHistory: "Remittance History",
                 addRemittance: "Add Remittance",
                 noRemittances: "No remittances added yet",
                 addFirstRemittance: "Add your first remittance to start",
+                withdrawalHistory: "Withdrawal History",
+                addWithdrawal: "Add Withdrawal",
+                noWithdrawals: "No withdrawals added yet",
+                addFirstWithdrawal: "Add withdrawals for more accurate calculation",
                 calculate: "Calculate Requirements",
                 assessmentPeriod: "Assessment Period",
                 startDate: "Start Date",
@@ -562,7 +689,9 @@
         let currentLang = localStorage.getItem('hsbc-calculator-lang') || 'zh';
         let depositMode = 'single';
         let remittanceCount = 0;
+        let withdrawalCount = 0;
         let calculationResult = null;
+        let requiredBalance = 10000;
 
         // Initialize
         document.addEventListener('DOMContentLoaded', () => {
@@ -593,10 +722,27 @@
                 }
             });
 
+            // Get withdrawals
+            const withdrawalItems = document.querySelectorAll('.withdrawal-item');
+            const withdrawals = [];
+
+            withdrawalItems.forEach(item => {
+                const dateInput = item.querySelector('.withdrawal-date');
+                const amountInput = item.querySelector('.withdrawal-amount');
+                if (dateInput.value || amountInput.value) {
+                    withdrawals.push({
+                        date: dateInput.value,
+                        amount: amountInput.value
+                    });
+                }
+            });
+
             const data = {
                 openingDate: openingDate,
                 remittances: remittances,
-                depositMode: depositMode
+                withdrawals: withdrawals,
+                depositMode: depositMode,
+                requiredBalance: requiredBalance
             };
 
             localStorage.setItem('hsbc-calculator-data', JSON.stringify(data));
@@ -618,6 +764,14 @@
                     depositMode = data.depositMode;
                     document.getElementById('modeSingle').classList.toggle('active', depositMode === 'single');
                     document.getElementById('modeDaily').classList.toggle('active', depositMode === 'daily');
+                }
+
+                // Restore required balance
+                if (data.requiredBalance) {
+                    requiredBalance = data.requiredBalance;
+                    document.getElementById('requiredBalanceInput').value = requiredBalance;
+                    document.getElementById('presetOne').classList.toggle('active', requiredBalance === 10000);
+                    document.getElementById('presetPremier').classList.toggle('active', requiredBalance === 1000000);
                 }
 
                 // Restore remittances
@@ -669,6 +823,53 @@
                     // Add one empty remittance row if no saved data
                     addRemittance();
                 }
+
+                // Restore withdrawals
+                if (data.withdrawals && data.withdrawals.length > 0) {
+                    const container = document.getElementById('withdrawalList');
+                    const emptyState = document.getElementById('emptyWithdrawalState');
+                    emptyState.style.display = 'none';
+
+                    data.withdrawals.forEach(withdrawal => {
+                        withdrawalCount++;
+                        const div = document.createElement('div');
+                        div.className = 'withdrawal-item items-start bg-red-50 rounded-xl p-3';
+                        div.id = `withdrawal-${withdrawalCount}`;
+                        div.innerHTML = `
+                            <div class="flex-1">
+                                <input
+                                    type="date"
+                                    class="withdrawal-date input-focus-ring w-full px-3 py-2 rounded-lg border border-claude-border bg-white text-sm text-claude-text transition-all duration-200"
+                                    value="${withdrawal.date || ''}"
+                                    onchange="saveData()"
+                                >
+                            </div>
+                            <div class="flex-1">
+                                <div class="relative">
+                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-claude-text-muted text-sm">$</span>
+                                    <input
+                                        type="number"
+                                        class="withdrawal-amount input-focus-ring w-full pl-7 pr-3 py-2 rounded-lg border border-claude-border bg-white text-sm text-claude-text transition-all duration-200"
+                                        placeholder="HKD"
+                                        min="0"
+                                        step="1"
+                                        value="${withdrawal.amount || ''}"
+                                        oninput="saveData()"
+                                    >
+                                </div>
+                            </div>
+                            <button
+                                onclick="removeWithdrawal(${withdrawalCount})"
+                                class="flex-shrink-0 p-2 text-claude-text-muted hover:text-red-500 transition-colors rounded-lg hover:bg-red-100"
+                            >
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                </svg>
+                            </button>
+                        `;
+                        container.appendChild(div);
+                    });
+                }
             } else {
                 // Add one empty remittance row if no saved data
                 addRemittance();
@@ -718,6 +919,38 @@
             // Recalculate display if we have results
             if (calculationResult) {
                 displayResults();
+            }
+        }
+
+        function setPresetBalance(amount) {
+            requiredBalance = amount;
+            document.getElementById('requiredBalanceInput').value = amount;
+
+            // Update preset button styles
+            document.getElementById('presetOne').classList.toggle('active', amount === 10000);
+            document.getElementById('presetPremier').classList.toggle('active', amount === 1000000);
+
+            saveData();
+
+            // Recalculate if we have results
+            if (calculationResult) {
+                calculate();
+            }
+        }
+
+        function onBalanceInput() {
+            const input = document.getElementById('requiredBalanceInput');
+            requiredBalance = parseFloat(input.value) || 0;
+
+            // Update preset button styles
+            document.getElementById('presetOne').classList.toggle('active', requiredBalance === 10000);
+            document.getElementById('presetPremier').classList.toggle('active', requiredBalance === 1000000);
+
+            saveData();
+
+            // Recalculate if we have results
+            if (calculationResult) {
+                calculate();
             }
         }
 
@@ -782,6 +1015,67 @@
             saveData();
         }
 
+        function addWithdrawal() {
+            withdrawalCount++;
+            const container = document.getElementById('withdrawalList');
+            const emptyState = document.getElementById('emptyWithdrawalState');
+
+            emptyState.style.display = 'none';
+
+            const div = document.createElement('div');
+            div.className = 'withdrawal-item items-start bg-red-50 rounded-xl p-3';
+            div.id = `withdrawal-${withdrawalCount}`;
+            div.innerHTML = `
+                <div class="flex-1">
+                    <input
+                        type="date"
+                        class="withdrawal-date input-focus-ring w-full px-3 py-2 rounded-lg border border-claude-border bg-white text-sm text-claude-text transition-all duration-200"
+                        onchange="saveData()"
+                    >
+                </div>
+                <div class="flex-1">
+                    <div class="relative">
+                        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-claude-text-muted text-sm">$</span>
+                        <input
+                            type="number"
+                            class="withdrawal-amount input-focus-ring w-full pl-7 pr-3 py-2 rounded-lg border border-claude-border bg-white text-sm text-claude-text transition-all duration-200"
+                            placeholder="HKD"
+                            min="0"
+                            step="1"
+                            oninput="saveData()"
+                        >
+                    </div>
+                </div>
+                <button
+                    onclick="removeWithdrawal(${withdrawalCount})"
+                    class="flex-shrink-0 p-2 text-claude-text-muted hover:text-red-500 transition-colors rounded-lg hover:bg-red-100"
+                >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                    </svg>
+                </button>
+            `;
+            container.appendChild(div);
+
+            // Save data after adding
+            saveData();
+        }
+
+        function removeWithdrawal(id) {
+            const element = document.getElementById(`withdrawal-${id}`);
+            if (element) {
+                element.remove();
+            }
+
+            const container = document.getElementById('withdrawalList');
+            if (container.children.length === 0) {
+                document.getElementById('emptyWithdrawalState').style.display = 'block';
+            }
+
+            // Save data after removing
+            saveData();
+        }
+
         function calculate() {
             const openingDateInput = document.getElementById('openingDate').value;
             if (!openingDateInput) {
@@ -794,7 +1088,7 @@
             const assessmentEnd = new Date(assessmentStart.getFullYear(), assessmentStart.getMonth() + 3, 0);
 
             const totalDays = Math.floor((assessmentEnd - assessmentStart) / (1000 * 60 * 60 * 24)) + 1;
-            const requiredBalanceDays = 10000 * totalDays;
+            const requiredBalanceDays = requiredBalance * totalDays;
 
             // Get remittances
             const remittanceItems = document.querySelectorAll('.remittance-item');
@@ -815,6 +1109,25 @@
                         currentBalanceDays += amount * daysFromRemitToEnd;
                     } else if (remitDate < assessmentStart) {
                         currentBalanceDays += amount * totalDays;
+                    }
+                }
+            });
+
+            // Get withdrawals (subtract from balance-days)
+            const withdrawalItems = document.querySelectorAll('.withdrawal-item');
+            withdrawalItems.forEach(item => {
+                const dateInput = item.querySelector('.withdrawal-date');
+                const amountInput = item.querySelector('.withdrawal-amount');
+
+                if (dateInput.value && amountInput.value) {
+                    const withdrawDate = new Date(dateInput.value);
+                    const amount = parseFloat(amountInput.value);
+
+                    if (withdrawDate >= assessmentStart && withdrawDate <= assessmentEnd) {
+                        const daysFromWithdrawToEnd = Math.floor((assessmentEnd - withdrawDate) / (1000 * 60 * 60 * 24)) + 1;
+                        currentBalanceDays -= amount * daysFromWithdrawToEnd;
+                    } else if (withdrawDate < assessmentStart) {
+                        currentBalanceDays -= amount * totalDays;
                     }
                 }
             });
