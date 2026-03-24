@@ -613,6 +613,8 @@
                 daysToEnd: "距结束",
                 requiredAmount: "需存金额",
                 today: "今天",
+                beforeAssessment: "评估期开始前",
+                days: "天",
                 dailyPlan: "每日存款计划",
                 dailyAmount: "每日存款金额",
                 planSummary: "计划摘要",
@@ -666,6 +668,8 @@
                 daysToEnd: "Days to End",
                 requiredAmount: "Required",
                 today: "Today",
+                beforeAssessment: "Before Assessment",
+                days: "days",
                 dailyPlan: "Daily Deposit Plan",
                 dailyAmount: "Daily Deposit Amount",
                 planSummary: "Plan Summary",
@@ -1105,7 +1109,8 @@
                     const amount = parseFloat(amountInput.value);
 
                     if (remitDate >= assessmentStart && remitDate <= assessmentEnd) {
-                        const daysFromRemitToEnd = Math.floor((assessmentEnd - remitDate) / (1000 * 60 * 60 * 24)) + 1;
+                        // Deposit counts from NEXT day, not same day (remove +1)
+                        const daysFromRemitToEnd = Math.floor((assessmentEnd - remitDate) / (1000 * 60 * 60 * 24));
                         currentBalanceDays += amount * daysFromRemitToEnd;
                     } else if (remitDate < assessmentStart) {
                         currentBalanceDays += amount * totalDays;
@@ -1124,7 +1129,8 @@
                     const amount = parseFloat(amountInput.value);
 
                     if (withdrawDate >= assessmentStart && withdrawDate <= assessmentEnd) {
-                        const daysFromWithdrawToEnd = Math.floor((assessmentEnd - withdrawDate) / (1000 * 60 * 60 * 24)) + 1;
+                        // Withdrawal counts from NEXT day, not same day (remove +1)
+                        const daysFromWithdrawToEnd = Math.floor((assessmentEnd - withdrawDate) / (1000 * 60 * 60 * 24));
                         currentBalanceDays -= amount * daysFromWithdrawToEnd;
                     } else if (withdrawDate < assessmentStart) {
                         currentBalanceDays -= amount * totalDays;
@@ -1138,8 +1144,27 @@
             // Calculate daily breakdown
             const dailyBreakdown = [];
             if (daysRemaining > 0 && remainingBalanceDays > 0) {
-                for (let i = 0; i <= daysRemaining; i++) {
-                    const depositDate = new Date(today);
+                // Check if we're before assessment period starts
+                if (today < assessmentStart) {
+                    // Add pre-assessment period entry
+                    const daysBeforeAssessment = Math.floor((assessmentStart - today) / (1000 * 60 * 60 * 24));
+                    const preAssessmentAmount = Math.ceil(remainingBalanceDays / totalDays);
+                    dailyBreakdown.push({
+                        date: today,
+                        daysToEnd: totalDays,
+                        requiredAmount: preAssessmentAmount,
+                        isToday: true,
+                        isPreAssessment: true,
+                        preAssessmentDays: daysBeforeAssessment
+                    });
+                }
+
+                // Continue with regular daily breakdown from max(today, assessmentStart)
+                const startDate = today < assessmentStart ? assessmentStart : today;
+                const daysToCalculate = Math.floor((assessmentEnd - startDate) / (1000 * 60 * 60 * 24)) + 1;
+
+                for (let i = 0; i < daysToCalculate; i++) {
+                    const depositDate = new Date(startDate);
                     depositDate.setDate(depositDate.getDate() + i);
                     if (depositDate > assessmentEnd) break;
 
@@ -1149,7 +1174,7 @@
                         date: depositDate,
                         daysToEnd: daysFromDepositToEnd,
                         requiredAmount: requiredAmount,
-                        isToday: i === 0
+                        isToday: depositDate.getTime() === today.getTime()
                     });
                 }
             }
@@ -1241,14 +1266,28 @@
                 dailyBreakdown.forEach((day, index) => {
                     const row = document.createElement('tr');
                     row.className = `daily-row ${day.isToday ? 'today' : ''}`;
-                    row.innerHTML = `
-                        <td class="py-2 px-3 text-claude-text">
-                            ${formatDate(day.date)}
-                            ${day.isToday ? '<span class="ml-1 text-xs text-claude-accent font-medium">(' + getTranslation('today') + ')</span>' : ''}
-                        </td>
-                        <td class="py-2 px-3 text-right text-claude-text-muted">${day.daysToEnd}</td>
-                        <td class="py-2 px-3 text-right font-semibold text-claude-accent">$${formatNumber(day.requiredAmount)}</td>
-                    `;
+
+                    if (day.isPreAssessment) {
+                        // Special rendering for pre-assessment period
+                        row.innerHTML = `
+                            <td class="py-2 px-3 text-claude-text">
+                                ${getTranslation('beforeAssessment')}
+                                <span class="ml-1 text-xs text-claude-text-muted">(${day.preAssessmentDays} ${getTranslation('days')})</span>
+                                ${day.isToday ? '<span class="ml-1 text-xs text-claude-accent font-medium">(' + getTranslation('today') + ')</span>' : ''}
+                            </td>
+                            <td class="py-2 px-3 text-right text-claude-text-muted">${day.daysToEnd}</td>
+                            <td class="py-2 px-3 text-right font-semibold text-claude-accent">$${formatNumber(day.requiredAmount)}</td>
+                        `;
+                    } else {
+                        row.innerHTML = `
+                            <td class="py-2 px-3 text-claude-text">
+                                ${formatDate(day.date)}
+                                ${day.isToday ? '<span class="ml-1 text-xs text-claude-accent font-medium">(' + getTranslation('today') + ')</span>' : ''}
+                            </td>
+                            <td class="py-2 px-3 text-right text-claude-text-muted">${day.daysToEnd}</td>
+                            <td class="py-2 px-3 text-right font-semibold text-claude-accent">$${formatNumber(day.requiredAmount)}</td>
+                        `;
+                    }
                     tbody.appendChild(row);
                 });
 
